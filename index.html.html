@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Алып Ер Тұңға: Тарихи Ойын</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Дыбыс үшін Tone.js кітапханасын қосу -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a1a;
+            background-image: url('https://www.transparenttextures.com/patterns/crissxcross.png');
+        }
+        .game-title, .category-title, .points-text {
+            font-family: 'Cinzel', serif;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+        }
+        .game-board-cell {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .game-board-cell:not(.disabled):hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(217, 119, 6, 0.4);
+        }
+        .modal-content {
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: #44403c !important;
+            color: #a8a29e;
+        }
+    </style>
+</head>
+<body class="bg-stone-900 text-amber-200 p-4 sm:p-6 md:p-8">
+
+    <div class="max-w-7xl mx-auto bg-stone-800/50 backdrop-blur-sm rounded-2xl shadow-2xl shadow-black/50 border border-amber-800 p-6 sm:p-8">
+        
+        <header class="text-center mb-8">
+            <h1 class="game-title text-4xl sm:text-5xl md:text-6xl font-bold text-amber-400">Алып Ер Тұңға</h1>
+            <p class="text-lg sm:text-xl text-stone-300 mt-2">Тарихи-әдеби ойын</p>
+        </header>
+
+        <!-- Ұпай және басқару -->
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 bg-black/20 p-4 rounded-lg">
+            <div class="text-2xl font-bold">
+                Жалпы ұпай: <span id="score" class="text-amber-300">0</span>
+            </div>
+            <div class="flex items-center gap-4">
+                 <button id="mute-button" title="Дыбысты қосу/өшіру" class="mt-4 sm:mt-0 bg-stone-600 hover:bg-stone-500 text-white font-bold p-2 rounded-lg transition duration-300 shadow-lg">
+                    <!-- Дыбыс иконкасы осында салынады -->
+                </button>
+                <button id="reset-button" class="mt-4 sm:mt-0 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 px-6 rounded-lg transition duration-300 shadow-lg">
+                    Қайта бастау
+                </button>
+            </div>
+        </div>
+
+        <div id="game-board" class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            <!-- Санаттар динамикалық түрде осында құрылады -->
+        </div>
+    </div>
+
+    <!-- Сұрақ/Жауап модальды терезесі -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 hidden">
+        <div id="modal-content" class="modal-content bg-stone-900 border-2 border-amber-600 rounded-2xl shadow-2xl shadow-amber-900/50 w-full max-w-2xl p-6 sm:p-8 text-center relative">
+            <button id="close-modal" class="absolute top-4 right-4 text-stone-400 hover:text-white text-3xl">&times;</button>
+            <div id="question-container">
+                <div class="flex items-center justify-center gap-4">
+                    <p id="question-text" class="text-xl sm:text-2xl text-white text-center"></p>
+                    <button id="tts-button" title="Сұрақты тыңдау" class="bg-sky-600 hover:bg-sky-500 text-white p-3 rounded-full transition duration-300 disabled:opacity-50 disabled:cursor-wait">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                    </button>
+                </div>
+                <div class="mt-6 flex flex-col items-center gap-4">
+                    <input type="text" id="answer-input" class="w-full max-w-sm bg-stone-700 border border-stone-600 text-white text-lg rounded-lg p-3 text-center focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="Жауабыңызды осында жазыңыз...">
+                    <button id="check-answer-button" class="bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 px-8 rounded-lg transition duration-300 text-lg">Жауапты тексеру</button>
+                </div>
+            </div>
+            <div id="answer-container" class="hidden">
+                <p id="result-message" class="text-2xl sm:text-3xl font-bold mb-4"></p>
+                <p class="text-lg text-stone-300 mb-2">Сіздің жауабыңыз: "<span id="user-answer-text" class="font-medium text-white"></span>"</p>
+                <p class="text-lg text-stone-300 mb-6">Дұрыс жауап: "<span id="correct-answer-text" class="font-medium text-amber-300"></span>"</p>
+                <div id="answer-icon" class="mb-6 flex justify-center items-center h-24"></div>
+                <button id="next-question-button" class="mt-6 bg-stone-600 hover:bg-stone-500 text-white font-bold py-2 px-8 rounded-lg transition duration-300 text-lg">Келесі</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- ОЙЫН ДЕРЕКТЕРІ (өзгеріссіз) ---
+        const gameData = {
+            'КІМ?': [
+                { points: 100, question: 'Жырда кімнің өлімі туралы айтылады?', answer: 'Алып Ер Тұңға', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-400"><path d="M15.5 16.5c-2-1-5-1-7 0"/><path d="M20 13c-2-4-4.5-5.5-8-5.5s-6 1.5-8 5.5"/><path d="M12 21v-1.5c0-1.4 1.1-2.5 2.5-2.5h0c1.4 0 2.5 1.1 2.5 2.5V21"/><path d="M12 21v-1.5c0-1.4-1.1-2.5-2.5-2.5h0c-1.4 0-2.5 1.1-2.5 2.5V21"/><path d="M12 3.5c-1.5 0-2.8 1.4-3 3"/><path d="M15 6.5c-.2-1.6-1.5-3-3-3"/><circle cx="12" cy="9.5" r="1.5"/></svg>` },
+                { points: 200, question: 'Жырда "бектердің бегін" кім аздырды?', answer: 'Дұшпан, ұрысы', icon: null },
+                { points: 300, question: 'Адамға торын құрған кім?', answer: 'Тәңірім', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-400"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>` },
+                { points: 400, question: 'Заманның өзгеруімен кімдер сиреді?', answer: 'Қайран бектер, біліктілер', icon: null }
+            ],
+            'ҚАЙДА?': [
+                { points: 100, question: 'Дұшпан не құрды?', answer: 'Тұзақты', icon: null },
+                { points: 200, question: 'Дүниеге қарап оқ атса, ненің басы кертілер?', answer: 'Таулардың басы', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-400"><path d="m8 3 4 8 5-5 5 15H2L8 3z"></path></svg>` },
+                { points: 300, question: '"Алып Ер Тұңғаны" ажал қайда алып кетті?', answer: 'Бұл дүниеден (артта қалды)', icon: null },
+                { points: 400, question: 'Тәңірдің торынан құтылып ешкім қайда кете алмады?', answer: 'Ешқайда (құтылып ешкім кетпедің)', icon: null }
+            ],
+            'ҚАШАН?': [
+                { points: 100, question: 'Жүрек қашан жыртылады?', answer: 'Алып Ер Тұңға өлгенде', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-400"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path><path d="m12 13-1-1-1 1-1-1-1 1-1-1-1 1"></path></svg>` },
+                { points: 200, question: 'Қашан жазылмас жара қалды?', answer: 'Көңілді қайғы жандырғанда', icon: null },
+                { points: 300, question: 'Жауыз қашан қаптап барады?', answer: 'Жалғанның туып заманында', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-400"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`},
+                { points: 400, question: 'Бектер қашан бөрідей ұлып жылады?', answer: 'Ерлікті қаза сынағанда', icon: null }
+            ],
+            'НЕ ІСТЕДІ?': [
+                { points: 100, question: 'Заман не істеді?', answer: 'Өшін алды', icon: null },
+                { points: 200, question: 'Ажал шеңгелін салып, не істеді?', answer: 'Алып Ер Тұңғаны алды', icon: null },
+                { points: 300, question: 'Тағдырдың оғы қадалып, алып шыңдар не істеді?', answer: 'Кертілді', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-400"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.59a2 2 0 0 1-2.83-2.83l.79-.79"></path></svg>`},
+                { points: 400, question: 'Дүние не істеп барады?', answer: 'Азып барады', icon: null }
+            ],
+        };
+
+        const gameBoard = document.getElementById('game-board');
+        const scoreElement = document.getElementById('score');
+        const modal = document.getElementById('modal');
+        const closeModalButton = document.getElementById('close-modal');
+        const questionContainer = document.getElementById('question-container');
+        const answerContainer = document.getElementById('answer-container');
+        const questionText = document.getElementById('question-text');
+        const answerIcon = document.getElementById('answer-icon');
+        const resetButton = document.getElementById('reset-button');
+        const muteButton = document.getElementById('mute-button');
+        const ttsButton = document.getElementById('tts-button');
+
+        // Жаңа элементтер
+        const answerInput = document.getElementById('answer-input');
+        const checkAnswerButton = document.getElementById('check-answer-button');
+        const resultMessage = document.getElementById('result-message');
+        const userAnswerText = document.getElementById('user-answer-text');
+        const correctAnswerText = document.getElementById('correct-answer-text');
+        const nextQuestionButton = document.getElementById('next-question-button');
+        
+        let currentPoints = 0;
+        let score = 0;
+        let currentCell = null;
+
+        // --- ДЫБЫС ЭФФЕКТІЛЕРІ ---
+        let audioInitialized = false;
+        let isMuted = false;
+        let correctSound, incorrectSound, clickSound;
+
+        const soundOnIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-volume-2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`;
+        const soundOffIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-volume-x"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`;
+        muteButton.innerHTML = soundOnIcon;
+        
+        function initializeAudio() {
+            if (audioInitialized || typeof Tone === 'undefined') return;
+            Tone.start();
+            correctSound = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.2, release: 0.5 } }).toDestination();
+            incorrectSound = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.5, sustain: 0.1, release: 0.5 } }).toDestination();
+            clickSound = new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 2, envelope: { attack: 0.001, decay: 0.2, sustain: 0 } }).toDestination();
+            audioInitialized = true;
+        }
+
+        muteButton.addEventListener('click', () => {
+            isMuted = !isMuted;
+            muteButton.innerHTML = isMuted ? soundOffIcon : soundOnIcon;
+        });
+        
+        // --- МӘТІНДІ ДАУЫСТАУ (TTS) ФУНКЦИЯЛАРЫ ---
+
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function pcmToWav(pcmData, sampleRate) {
+            const numChannels = 1;
+            const bitsPerSample = 16;
+            const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+            const blockAlign = numChannels * bitsPerSample / 8;
+            const dataSize = pcmData.length * pcmData.BYTES_PER_ELEMENT;
+
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+
+            view.setUint32(0, 0x52494646, false); // "RIFF"
+            view.setUint32(4, 36 + dataSize, true);
+            view.setUint32(8, 0x57415645, false); // "WAVE"
+            view.setUint32(12, 0x666d7420, false); // "fmt "
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitsPerSample, true);
+            view.setUint32(36, 0x64617461, false); // "data"
+            view.setUint32(40, dataSize, true);
+
+            const pcm16 = new Int16Array(buffer, 44);
+            pcm16.set(pcmData);
+
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        async function playTTS(text) {
+            ttsButton.disabled = true;
+            try {
+                const apiKey = ""; 
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: text }] }],
+                    generationConfig: {
+                        responseModalities: ["AUDIO"],
+                    }
+                };
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    console.error("API Error Response:", errorBody);
+                    throw new Error(`API error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                const candidate = result?.candidates?.[0];
+                const audioPart = candidate?.content?.parts?.find(p => p.inlineData && p.inlineData.mimeType.startsWith("audio/"));
+
+                if (audioPart) {
+                    const audioData = audioPart.inlineData.data;
+                    const mimeType = audioPart.inlineData.mimeType;
+                    const rateMatch = mimeType.match(/rate=(\d+)/);
+                    if (!rateMatch) throw new Error("Sample rate not found in mimeType");
+                    
+                    const sampleRate = parseInt(rateMatch[1], 10);
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmData);
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+                    audio.onended = () => { ttsButton.disabled = false; };
+                } else {
+                    console.error("Could not find audio data in response:", result);
+                    throw new Error('Audio data not found in response.');
+                }
+            } catch (error) {
+                console.error("TTS ойнату кезінде қате:", error);
+                ttsButton.disabled = false;
+            }
+        }
+        ttsButton.addEventListener('click', () => playTTS(questionText.textContent));
+
+        // --- ОЙЫННЫҢ НЕГІЗГІ ЛОГИКАСЫ ---
+        function setupBoard() {
+            gameBoard.innerHTML = '';
+            for (const category in gameData) {
+                const categoryColumn = document.createElement('div');
+                categoryColumn.classList.add('flex', 'flex-col', 'gap-3', 'sm:gap-4');
+                const categoryTitle = document.createElement('div');
+                categoryTitle.className = 'category-title text-center text-xl sm:text-2xl font-bold h-16 flex items-center justify-center text-amber-400';
+                categoryTitle.textContent = category;
+                categoryColumn.appendChild(categoryTitle);
+                gameData[category].forEach(item => {
+                    const cell = document.createElement('div');
+                    cell.className = 'game-board-cell bg-amber-800/80 hover:bg-amber-700/80 cursor-pointer h-20 sm:h-24 flex items-center justify-center rounded-lg shadow-md';
+                    cell.dataset.points = item.points;
+                    cell.dataset.question = item.question;
+                    cell.dataset.answer = item.answer;
+                    cell.dataset.icon = item.icon || '';
+                    const pointsText = document.createElement('span');
+                    pointsText.className = 'points-text text-3xl sm:text-4xl font-bold';
+                    pointsText.textContent = item.points;
+                    cell.appendChild(pointsText);
+                    cell.addEventListener('click', handleCellClick);
+                    categoryColumn.appendChild(cell);
+                });
+                gameBoard.appendChild(categoryColumn);
+            }
+        }
+
+        function handleCellClick(event) {
+            initializeAudio(); 
+            if (!isMuted && audioInitialized) {
+                clickSound.triggerAttackRelease("C2", "8n");
+            }
+            const cell = event.currentTarget;
+            if (cell.classList.contains('disabled')) return;
+            currentCell = cell;
+            currentPoints = parseInt(cell.dataset.points);
+            questionText.textContent = cell.dataset.question;
+            answerIcon.innerHTML = cell.dataset.icon;
+            
+            answerInput.value = '';
+            ttsButton.disabled = false;
+            questionContainer.style.display = 'block';
+            answerContainer.style.display = 'none';
+            modal.classList.remove('hidden');
+        }
+
+        checkAnswerButton.addEventListener('click', () => {
+            const userAnswer = answerInput.value.trim().toLowerCase();
+            const correctAnswer = currentCell.dataset.answer.trim().toLowerCase();
+
+            questionContainer.style.display = 'none';
+            answerContainer.style.display = 'block';
+
+            userAnswerText.textContent = answerInput.value || 'Бос';
+            correctAnswerText.textContent = currentCell.dataset.answer;
+
+            if (userAnswer === correctAnswer) {
+                resultMessage.textContent = 'Дұрыс!';
+                resultMessage.className = 'text-2xl sm:text-3xl font-bold mb-4 text-green-400';
+                updateScore(currentPoints);
+                if (!isMuted && audioInitialized) {
+                    const now = Tone.now();
+                    correctSound.triggerAttackRelease("C5", "8n", now);
+                    correctSound.triggerAttackRelease("G5", "8n", now + 0.2);
+                }
+            } else {
+                resultMessage.textContent = 'Қате!';
+                resultMessage.className = 'text-2xl sm:text-3xl font-bold mb-4 text-red-400';
+                if (!isMuted && audioInitialized) {
+                    incorrectSound.triggerAttackRelease("G2", "4n");
+                }
+            }
+        });
+        
+        function closeModal() {
+            modal.classList.add('hidden');
+            if (currentCell) {
+                currentCell.classList.add('disabled');
+                currentCell.querySelector('.points-text').textContent = '—';
+                currentCell = null;
+            }
+        }
+
+        function updateScore(points) {
+            score += points;
+            scoreElement.textContent = score;
+        }
+
+        nextQuestionButton.addEventListener('click', closeModal);
+        
+        closeModalButton.addEventListener('click', closeModal);
+
+        resetButton.addEventListener('click', () => {
+            score = 0;
+            scoreElement.textContent = '0';
+            setupBoard();
+        });
+        
+        setupBoard();
+    </script>
+
+</body>
+</html>
+
